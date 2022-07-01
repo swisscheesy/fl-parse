@@ -49,23 +49,28 @@ func (ql *QueryList) AddQuery(query QueryParams) {
 
 // InitializeDecompPoolAndRun / Creates a worker pool to query the data from Decomp
 func (ql *QueryList) InitializeDecompPoolAndRun() {
-	qWorkers := 5
+	qWorkers := 2
 	qJobs := make(chan QueryParams, len(ql.Queries))
 	qResults := make(chan int, len(ql.Queries))
+	qCount := len(ql.Queries)
+	fmt.Printf("Total count: %d\n", qCount)
 
 	for w := 0; w <= qWorkers; w++ {
 		go QueryDecomp(qJobs, qResults)
 	}
 
-	go func() {
-		for j := 0; j < len(ql.Queries); j++ {
-			qJobs <- ql.Queries[j]
-		}
-		close(qJobs)
-	}()
+	//go func() {
+	for j := 0; j < qCount; j++ {
+		qJobs <- ql.Queries[j]
+	}
+	fmt.Printf("Job Lenth: %d\n", len(qJobs))
+	close(qJobs)
+	//}()
 
-	for a := 0; a <= len(ql.Queries); a++ {
+	for a := 0; a <= qCount; a++ {
 		<-qResults
 	}
+
+	fmt.Printf("Results Count: %d", len(qResults))
 
 }
