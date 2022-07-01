@@ -2,7 +2,6 @@ package querylist
 
 import (
 	"fmt"
-	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
@@ -17,58 +16,56 @@ type QueryParams struct {
 	TableColumns []string
 }
 type QueryList struct {
-	Queries       []QueryParams
-	QueuedQueries chan func()
+	Queries []QueryParams
 }
 
-type Query interface {
-	QueryDecomp(tableName string, tableColumns []string)
+func QueryDecomp(jobs <-chan QueryParams, results chan<- int) {
+	for j := range jobs {
+		// Holds all the columns that will be searched for the selected table
+		var searchCols string
+
+		// Set the generated .txt filepath and name
+		fileName := filepath.Join(textOutputPath + j.TableName + ".txt")
+		searchCols = strings.Join(j.TableColumns, ",")
+
+		// Display Table information
+		fmt.Printf("Worker Started \nTable: %v\n", j.TableName)
+
+		queryStr := fmt.Sprintf("select %v FROM %v", searchCols, j.TableName)
+
+		proc := exec.Command(decompPath, imdListPath, queryStr, fileName)
+		if err := proc.Run(); err != nil {
+			fmt.Println(err)
+			results <- 0
+		}
+		results <- 1
+	}
 }
 
-func (qp *QueryParams) QueryDecomp(tableName string, tableColumns []string) {
-
-}
-
+// AddQuery / Adds a QueryParams to the end of the QueryList
 func (ql *QueryList) AddQuery(query QueryParams) {
 	ql.Queries = append(ql.Queries, query)
 }
 
-func (ql *QueryList) RunDecompQueries() {
-	// Holds all the columns that will be searched for the selected table
-	var searchCols []string
-	const numDecompWorkers = 5
-	qJobs := make(chan string, len(ql.Queries))
+// InitializeDecompPoolAndRun / Creates a worker pool to query the data from Decomp
+func (ql *QueryList) InitializeDecompPoolAndRun() {
+	qWorkers := 5
+	qJobs := make(chan QueryParams, len(ql.Queries))
 	qResults := make(chan int, len(ql.Queries))
 
-	for i := 0; i <= numDecompWorkers; i++ {
+	for w := 0; w <= qWorkers; w++ {
+		go QueryDecomp(qJobs, qResults)
 	}
 
-	// Iterate over the queries held in the QueryList
-	for i := 0; i < len(ql.Queries); i++ {
-		// Set the generated .txt filepath and name
-		fileName := filepath.Join(textOutputPath + ql.Queries[i].TableName + ".txt")
-		// Iterate over the TableColumns in the selected QueryParams in order to build the select statement
-		for _, v2 := range ql.Queries {
-			searchCols = append(searchCols, strings.Join(v2.TableColumns, ","))
+	go func() {
+		for j := 0; j < len(ql.Queries); j++ {
+			qJobs <- ql.Queries[j]
 		}
+		close(qJobs)
+	}()
 
-		// Display the args that will be used with decomp
-		fmt.Printf("\"%v\" \"%v\" \"select %v FROM %v\" \"%v\"", decompPath, imdListPath, searchCols[i], ql.Queries[i].TableName, fileName)
-
-		queryStr := fmt.Sprintf("select %v FROM %v", searchCols[i], ql.Queries[i].TableName)
-
-		proc := exec.Command(decompPath, imdListPath, queryStr, fileName)
-		proc.Stdout = os.Stdout
-		proc.Stderr = os.Stderr
-		if err := proc.Run(); err != nil {
-			fmt.Println(err)
-		}
+	for a := 0; a <= len(ql.Queries); a++ {
+		<-qResults
 	}
-}
 
-func NewQuery(tableName string, tableCols []string) QueryParams {
-	return QueryParams{
-		TableName:    tableName,
-		TableColumns: tableCols,
-	}
 }

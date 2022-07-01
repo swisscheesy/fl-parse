@@ -9,17 +9,13 @@ import (
 )
 
 var schemaPath = "C:\\FED_LOG\\TOOLS\\SCHEMA.txt"
-var decompPath = "C:\\FED_LOG\\TOOLS\\UTILITIES\\Decomp.exe"
-var textOutputPath = "C:\\db_texts\\"
-var csvFilePath = "C:\\db_csv"
-var imdListPath = "C:\\FED_LOG"
 
+// Only Doing 52 tables
 func main() {
-	openSchema()
+	ParseTableSchema()
 }
 
-func openSchema() {
-	//var queryWg sync.WaitGroup
+func ParseTableSchema() {
 	ql := querylist.QueryList{}
 
 	file, err := os.Open(schemaPath)
@@ -27,15 +23,9 @@ func openSchema() {
 		fmt.Println("error opening file: ", err)
 	}
 
-	// Ignore all line starting with '-'
-
-	// Table columns to query
-	//tableCols := make([]string, 0)
-
 	queryCount := 0
 	var curTable = ""
 	curColList := make([]string, 0)
-	//var queryBlock []string
 
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
@@ -67,12 +57,10 @@ func openSchema() {
 		}
 	}
 	fmt.Println("QueryParams Count: ", queryCount)
-	test(ql)
+	BeginDecompQuery(ql)
 }
 
-// No channels -- 20% cpu, 50% ram
-// 35m -- 34/100
-
-func test(ql querylist.QueryList) {
-
+// BeginDecompQuery / Takes the supplied Querlist and runs it through Decomp to retrieve the output
+func BeginDecompQuery(ql querylist.QueryList) {
+	ql.InitializeDecompPoolAndRun()
 }
