@@ -5,6 +5,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 )
 
 var textOutputPath = "C:\\db_texts\\"
@@ -19,7 +20,7 @@ type QueryList struct {
 	Queries []QueryParams
 }
 
-func QueryDecomp(jobs <-chan QueryParams, results chan<- int) {
+func QueryDecomp(wg *sync.WaitGroup, jobs <-chan QueryParams) {
 	for j := range jobs {
 		// Holds all the columns that will be searched for the selected table
 		var searchCols string
@@ -36,9 +37,8 @@ func QueryDecomp(jobs <-chan QueryParams, results chan<- int) {
 		proc := exec.Command(decompPath, imdListPath, queryStr, fileName)
 		if err := proc.Run(); err != nil {
 			fmt.Println(err)
-			results <- 0
 		}
-		results <- 1
+		wg.Done()
 	}
 }
 
@@ -51,26 +51,19 @@ func (ql *QueryList) AddQuery(query QueryParams) {
 func (ql *QueryList) InitializeDecompPoolAndRun() {
 	qWorkers := 2
 	qJobs := make(chan QueryParams, len(ql.Queries))
-	qResults := make(chan int, len(ql.Queries))
 	qCount := len(ql.Queries)
-	fmt.Printf("Total count: %d\n", qCount)
+
+	var wg sync.WaitGroup
 
 	for w := 0; w <= qWorkers; w++ {
-		go QueryDecomp(qJobs, qResults)
+		go QueryDecomp(&wg, qJobs)
 	}
 
-	//go func() {
-	for j := 0; j < qCount; j++ {
-		qJobs <- ql.Queries[j]
+	for j := 1; j <= qCount; j++ {
+		qJobs <- ql.Queries[j-1]
+		wg.Add(1)
 	}
-	fmt.Printf("Job Lenth: %d\n", len(qJobs))
 	close(qJobs)
-	//}()
-
-	for a := 0; a <= qCount; a++ {
-		<-qResults
-	}
-
-	fmt.Printf("Results Count: %d", len(qResults))
+	wg.Wait()
 
 }
