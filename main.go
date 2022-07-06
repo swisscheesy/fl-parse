@@ -2,20 +2,28 @@ package main
 
 import (
 	"bufio"
+	"fl-parse/csv"
 	"fl-parse/querylist"
 	"fmt"
 	"os"
 	"strings"
 )
 
-var schemaPath = "C:\\FED_LOG\\TOOLS\\SCHEMA.txt"
+var (
+	// Location of Fedlog's SCHEMA.txt
+	schemaPath = "C:\\FED_LOG\\TOOLS\\SCHEMA.txt"
+	// Destination for decomp generated txt files
+	textOutputPath = "C:\\db_texts\\"
+)
 
-// Only Doing 52 tables
 func main() {
-	ParseTableSchema()
+	openSchema()
 }
 
-func ParseTableSchema() {
+// openSchema / Parses SCHEMA.txt file that is included with FEDLOG tools in order to retrieve
+// all table names and columns that will be searched.
+// Assuming SCHEMA.txt will be updated with any table additions or removals for each version.
+func openSchema() {
 	ql := querylist.QueryList{}
 
 	file, err := os.Open(schemaPath)
@@ -57,10 +65,17 @@ func ParseTableSchema() {
 		}
 	}
 	fmt.Println("QueryParams Count: ", queryCount)
-	BeginDecompQuery(ql)
-}
-
-// BeginDecompQuery / Takes the supplied Querlist and runs it through Decomp to retrieve the output
-func BeginDecompQuery(ql querylist.QueryList) {
+	// Begin querying decomp with the table data
 	ql.InitializeDecompPoolAndRun()
+
+	// Retrieve file info for all created .txt files
+	txtOutputFiles := csv.GetTxtFilesFromPath(textOutputPath)
+
+	// Convert txt files to csv if they exist
+	if len(txtOutputFiles) > 0 {
+		for i := range txtOutputFiles {
+			csv.WriteContentToCsv(txtOutputFiles[i])
+		}
+	}
+
 }
