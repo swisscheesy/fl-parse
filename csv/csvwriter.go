@@ -8,6 +8,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 )
 
@@ -44,6 +45,13 @@ func retrieveTextFiles(f []os.FileInfo) []string {
 	return txtFiles
 }
 
+// isValidNIIN checks if a NIIN contains only digits (0-9)
+func isValidNIIN(niin string) bool {
+	// Check if string contains only digits
+	matched, _ := regexp.MatchString(`^\d+$`, niin)
+	return matched
+}
+
 // WriteContentToCsv / Creates a csv file for the given name, and parses the txt file of the same name
 // in order to fill it
 func WriteContentToCsv(fileName string) {
@@ -66,12 +74,28 @@ func WriteContentToCsv(fileName string) {
 
 	scanner := bufio.NewScanner(file)
 	fmt.Printf("Starting on file: %v\n", fName)
+
+	var totalRows, validRows, filteredRows int
+
 	for scanner.Scan() {
 		rowTxt := scanner.Text()
 		// If line is not empty
 		if len(rowTxt) > 0 {
+			totalRows++
 			// Split data by default '|' 'pipe' delimiter
 			content := strings.Split(rowTxt, "|")
+
+			// Validate NIIN (first column) only for part_number.txt - skip row if invalid
+			if fName == "part_number" && len(content) > 0 && !isValidNIIN(content[0]) {
+				filteredRows++
+				continue
+			}
+
+			// Filter colloquial_name.txt - skip rows with empty colloquial_name column (index 2)
+			if fName == "colloquial_name" && len(content) > 2 && strings.TrimSpace(content[2]) == "" {
+				filteredRows++
+				continue
+			}
 
 			// csv in std library doesn't easily allow additional quotes, and it's not worth rewriting.
 			// Instead, fields come out as """field""" instead of "field"
@@ -84,8 +108,12 @@ func WriteContentToCsv(fileName string) {
 			if err != nil {
 				log.Panicf("Unable to write to csv file %v", err)
 			}
+			validRows++
 		}
 	}
+
+	fmt.Printf("File: %v - Total rows: %d, Valid rows: %d, Filtered rows: %d\n",
+		fName, totalRows, validRows, filteredRows)
 	if err := scanner.Err(); err != nil {
 		log.Panic(err)
 	}
