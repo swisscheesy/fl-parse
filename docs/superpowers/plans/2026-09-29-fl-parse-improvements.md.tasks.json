@@ -36,7 +36,7 @@
     {
       "id": 4,
       "subject": "Task 5: main wiring and output",
-      "status": "pending",
+      "status": "completed",
       "description": "**Goal:** main parses flags, handles schema open errors (bug #2), runs pool, prints per-table lines and summary from one goroutine, exits non-zero on failure.\n\n**Files:**\n- main.go\n\n**Acceptance Criteria:**\n- [ ] Missing schema -> stderr error, exit 1, text dir untouched\n- [ ] Zero tables -> exit 1; prints 'Tables found: N' == len(tables)\n- [ ] Per-table [i/N] ok/FAIL lines and 'Done: X ok, Y failed in <elapsed>'; exit 1 if any failed\n- [ ] Text dir created before Decomp runs\n\n**Verify:** `go build ./... && go vet ./... && GOOS=windows go build -o /dev/null ./... && go test ./... -race -> exit 0`\n\nFull steps and code: see Task 5 in docs/superpowers/plans/2026-09-29-fl-parse-improvements.md\n\n```json:metadata\n{\"files\": [\"main.go\"], \"verifyCommand\": \"go build ./... && go vet ./... && GOOS=windows go build -o /dev/null ./... && go test ./... -race -> exit 0\", \"acceptanceCriteria\": [\"Missing schema -> stderr error, exit 1, text dir untouched\", \"Zero tables -> exit 1; prints 'Tables found: N' == len(tables)\", \"Per-table [i/N] ok/FAIL lines and 'Done: X ok, Y failed in <elapsed>'; exit 1 if any failed\", \"Text dir created before Decomp runs\"], \"modelTier\": \"standard\"}\n```",
       "blockedBy": [
         0,
@@ -55,5 +55,5 @@
       ]
     }
   ],
-  "lastUpdated": "2026-09-29T22:06:58.354107"
+  "lastUpdated": "2026-09-29T22:08:03.734749"
 }
