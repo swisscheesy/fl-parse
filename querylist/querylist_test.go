@@ -1,11 +1,16 @@
 package querylist
 
 import (
+	"os"
+	"path/filepath"
+	"runtime"
 	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
 
+	"fl-parse/config"
+	"fl-parse/csv"
 	"fl-parse/schema"
 )
 
@@ -67,4 +72,49 @@ func TestRunProcessesEveryTableOnceWithBoundedWorkers(t *testing.T) {
 
 func TestRunWithNoTables(t *testing.T) {
 	Run(nil, 3, func(schema.Table) Result { t.Fatal("unexpected"); return Result{} }, func(Result) {})
+}
+
+func skipUnlessUnix(t *testing.T, bin string) {
+	t.Helper()
+	if runtime.GOOS == "windows" {
+		t.Skip("unix-only")
+	}
+	if _, err := os.Stat(bin); err != nil {
+		t.Skipf("%s not available", bin)
+	}
+}
+
+func TestProcessorDoesNotUseStaleTxtWhenDecompWritesNothing(t *testing.T) {
+	skipUnlessUnix(t, "/usr/bin/true")
+	textDir, csvDir := t.TempDir(), t.TempDir()
+	stale := filepath.Join(textDir, "foo.txt")
+	if err := os.WriteFile(stale, []byte("stale\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cfg := config.Config{DecompPath: "/usr/bin/true", TextDir: textDir, CSVDir: csvDir}
+	res := NewProcessor(cfg)(schema.Table{Name: "XXfoo", Columns: []string{"A"}})
+	if res.Err == nil {
+		t.Fatal("expected error when Decomp writes no file")
+	}
+	if _, err := os.Stat(stale); !os.IsNotExist(err) {
+		t.Fatalf("stale txt should be removed, stat err = %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(csvDir, "foo.csv")); !os.IsNotExist(err) {
+		t.Fatalf("foo.csv should not exist, stat err = %v", err)
+	}
+}
+
+func TestProcessorDecompFailure(t *testing.T) {
+	skipUnlessUnix(t, "/usr/bin/false")
+	cfg := config.Config{DecompPath: "/usr/bin/false", TextDir: t.TempDir(), CSVDir: t.TempDir()}
+	res := NewProcessor(cfg)(schema.Table{Name: "XXfoo", Columns: []string{"A"}})
+	if res.Err == nil {
+		t.Fatal("expected error")
+	}
+	if res.Stats != (csv.Stats{}) {
+		t.Fatalf("stats should be zero, got %+v", res.Stats)
+	}
+	if res.Elapsed <= 0 {
+		t.Fatalf("Elapsed = %v, want > 0", res.Elapsed)
+	}
 }

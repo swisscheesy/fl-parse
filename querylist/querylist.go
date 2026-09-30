@@ -4,6 +4,7 @@ package querylist
 
 import (
 	"fmt"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
@@ -83,6 +84,12 @@ func NewProcessor(cfg config.Config) func(schema.Table) Result {
 
 		txtPath := filepath.Join(cfg.TextDir, name+".txt")
 		query := fmt.Sprintf("select %v FROM %v", strings.Join(t.Columns, ","), t.Name)
+
+		// a stale file from a previous run must not be mistaken for this run's output
+		if err := os.Remove(txtPath); err != nil && !os.IsNotExist(err) {
+			res.Err = fmt.Errorf("removing stale %s: %w", txtPath, err)
+			return
+		}
 
 		cmd := exec.Command(cfg.DecompPath, cfg.IMDListPath, query, txtPath)
 		if out, err := cmd.CombinedOutput(); err != nil {
