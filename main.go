@@ -1,81 +1,77 @@
 package main
 
 import (
-	"bufio"
-	"fl-parse/csv"
-	"fl-parse/querylist"
 	"fmt"
+	"io"
 	"os"
-	"strings"
-)
+	"time"
 
-var (
-	// Location of Fedlog's SCHEMA.txt
-	schemaPath = "C:\\FED_LOG\\TOOLS\\SCHEMA.txt"
-	// Destination for decomp generated txt files
-	textOutputPath = "C:\\db_texts\\"
+	"fl-parse/config"
+	"fl-parse/querylist"
+	"fl-parse/schema"
 )
 
 func main() {
-	openSchema()
+	os.Exit(run(os.Args[1:], os.Stdout, os.Stderr))
 }
 
-// openSchema / Parses SCHEMA.txt file that is included with FEDLOG tools in order to retrieve
-// all table names and columns that will be searched.
-// Assuming SCHEMA.txt will be updated with any table additions or removals for each version.
-func openSchema() {
-	ql := querylist.QueryList{}
-
-	file, err := os.Open(schemaPath)
+// run parses SCHEMA.txt, queries Decomp for every table, converts each result to CSV, and returns
+// the process exit code (0 = all tables succeeded).
+func run(args []string, stdout, stderr io.Writer) int {
+	cfg, err := config.Parse(args)
 	if err != nil {
-		fmt.Println("error opening file: ", err)
+		fmt.Fprintln(stderr, "error:", err)
+		return 2
 	}
 
-	queryCount := 0
-	var curTable = ""
-	curColList := make([]string, 0)
-
-	scanner := bufio.NewScanner(file)
-	for scanner.Scan() {
-		curLine := scanner.Text()
-
-		if len(curLine) != 0 {
-			// Ignore any lines that begin with "`", these are usually at the top and act as comments
-			if !strings.HasPrefix(curLine, "-") {
-				if strings.Contains(curLine, "Disc") {
-					tableSlice := strings.Split(curLine, " ")
-					curTable = tableSlice[0]
-					queryCount += 1
-				} else {
-					trimLine := strings.TrimSpace(curLine)
-					colSlice := strings.Split(trimLine, " ")
-					curColList = append(curColList, colSlice[0])
-				}
-			}
-
-		}
-		// Reached an empty line, create query from curTable and curColList
-		if len(curLine) == 0 && len(curTable) != 0 && len(curColList) != 0 {
-			ql.AddQuery(querylist.QueryParams{
-				TableName:    curTable,
-				TableColumns: curColList,
-			})
-			curTable = ""
-			curColList = make([]string, 0)
-		}
+	tables, err := loadSchema(cfg.SchemaPath)
+	if err != nil {
+		fmt.Fprintln(stderr, "error reading schema:", err)
+		return 1
 	}
-	fmt.Println("QueryParams Count: ", queryCount)
-	// Begin querying decomp with the table data
-	ql.InitializeDecompPoolAndRun()
+	if len(tables) == 0 {
+		fmt.Fprintln(stderr, "error: no tables found in", cfg.SchemaPath)
+		return 1
+	}
+	fmt.Fprintf(stdout, "Tables found: %d\n", len(tables))
 
-	// Retrieve file info for all created .txt files
-	txtOutputFiles := csv.GetTxtFilesFromPath(textOutputPath)
-
-	// Convert txt files to csv if they exist
-	if len(txtOutputFiles) > 0 {
-		for i := range txtOutputFiles {
-			csv.WriteContentToCsv(txtOutputFiles[i])
-		}
+	if err := os.MkdirAll(cfg.TextDir, 0o755); err != nil {
+		fmt.Fprintln(stderr, "error creating text dir:", err)
+		return 1
 	}
 
+	start := time.Now()
+	var failed []querylist.Result
+	done := 0
+	querylist.Run(tables, cfg.Workers, querylist.NewProcessor(cfg), func(r querylist.Result) {
+		done++
+		if r.Err != nil {
+			failed = append(failed, r)
+			fmt.Fprintf(stdout, "[%d/%d] FAIL %s  %v\n", done, len(tables), r.Table, r.Err)
+			return
+		}
+		fmt.Fprintf(stdout, "[%d/%d] ok   %s  total=%d valid=%d filtered=%d  %s\n",
+			done, len(tables), r.Name, r.Stats.Total, r.Stats.Valid, r.Stats.Filtered,
+			r.Elapsed.Round(time.Millisecond))
+	})
+
+	fmt.Fprintf(stdout, "Done: %d ok, %d failed in %s\n",
+		len(tables)-len(failed), len(failed), time.Since(start).Round(time.Millisecond))
+	if len(failed) > 0 {
+		fmt.Fprintln(stderr, "Failed tables:")
+		for _, r := range failed {
+			fmt.Fprintf(stderr, "  %s: %v\n", r.Table, r.Err)
+		}
+		return 1
+	}
+	return 0
+}
+
+func loadSchema(path string) ([]schema.Table, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	return schema.Parse(f)
 }
