@@ -10,7 +10,7 @@
     {
       "id": 1,
       "subject": "Task 2: Schema parser",
-      "status": "pending",
+      "status": "completed",
       "description": "**Goal:** Pure schema.Parse(io.Reader) that flushes the final table at EOF (bug #1); table count is len(tables).\n\n**Files:**\n- schema/schema.go\n- schema/schema_test.go\n\n**Acceptance Criteria:**\n- [ ] Last table without trailing blank line is returned\n- [ ] '-' lines ignored, blank line ends a table, 'Disc' header heuristic unchanged\n- [ ] Whitespace-only lines skipped without panic; header with no columns yields no table\n\n**Verify:** `go test ./schema/ -v -> all PASS`\n\nFull steps and code: see Task 2 in docs/superpowers/plans/2026-09-29-fl-parse-improvements.md\n\n```json:metadata\n{\"files\": [\"schema/schema.go\", \"schema/schema_test.go\"], \"verifyCommand\": \"go test ./schema/ -v -> all PASS\", \"acceptanceCriteria\": [\"Last table without trailing blank line is returned\", \"'-' lines ignored, blank line ends a table, 'Disc' header heuristic unchanged\", \"Whitespace-only lines skipped without panic; header with no columns yields no table\"], \"modelTier\": \"mechanical\"}\n```"
     },
     {
@@ -55,5 +55,5 @@
       ]
     }
   ],
-  "lastUpdated": "2026-09-29T22:01:59.079998"
+  "lastUpdated": "2026-09-29T22:03:34.513529"
 }
