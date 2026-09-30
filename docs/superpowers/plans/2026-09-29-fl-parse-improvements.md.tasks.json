@@ -25,7 +25,7 @@
     {
       "id": 3,
       "subject": "Task 4: Worker pool and Decomp processor",
-      "status": "pending",
+      "status": "completed",
       "description": "**Goal:** Generic Run pool with exactly N workers and no WaitGroup race, plus NewProcessor that runs Decomp then converts that table's file (bugs #8,#9, overlap).\n\n**Files:**\n- querylist/querylist.go\n- querylist/querylist_test.go\n\n**Acceptance Criteria:**\n- [ ] Run uses exactly `workers` goroutines, processes each table once, calls onResult from one goroutine\n- [ ] go test -race clean\n- [ ] FileBase strips 2-char prefix, lowercases, errors on names <3 chars\n- [ ] Conversion skipped when Decomp fails; Decomp output captured in error; Elapsed populated\n\n**Verify:** `go test ./querylist/ -v -race -> all PASS`\n\nFull steps and code: see Task 4 in docs/superpowers/plans/2026-09-29-fl-parse-improvements.md\n\n```json:metadata\n{\"files\": [\"querylist/querylist.go\", \"querylist/querylist_test.go\"], \"verifyCommand\": \"go test ./querylist/ -v -race -> all PASS\", \"acceptanceCriteria\": [\"Run uses exactly `workers` goroutines, processes each table once, calls onResult from one goroutine\", \"go test -race clean\", \"FileBase strips 2-char prefix, lowercases, errors on names <3 chars\", \"Conversion skipped when Decomp fails; Decomp output captured in error; Elapsed populated\"], \"modelTier\": \"standard\"}\n```",
       "blockedBy": [
         0,
@@ -55,5 +55,5 @@
       ]
     }
   ],
-  "lastUpdated": "2026-09-29T22:05:47.466792"
+  "lastUpdated": "2026-09-29T22:06:58.354107"
 }
