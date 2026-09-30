@@ -13,7 +13,8 @@ type Table struct {
 }
 
 // Parse reads SCHEMA.txt. A table is a header line (contains "Disc") followed by one column per
-// line, terminated by a blank line or EOF. Lines starting with "-" are comments.
+// line, terminated by EOF or by a blank line once it has both a header and at least one column
+// (blank lines before that are ignored). Lines starting with "-" are comments.
 func Parse(r io.Reader) ([]Table, error) {
 	var tables []Table
 	var curTable string
@@ -30,7 +31,9 @@ func Parse(r io.Reader) ([]Table, error) {
 	for scanner.Scan() {
 		line := scanner.Text()
 		if len(line) == 0 {
-			flush()
+			if curTable != "" && len(curCols) > 0 {
+				flush()
+			}
 			continue
 		}
 		if strings.HasPrefix(line, "-") {

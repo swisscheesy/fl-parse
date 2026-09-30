@@ -46,3 +46,25 @@ func TestParseEmpty(t *testing.T) {
 		t.Fatalf("got %v, %v", got, err)
 	}
 }
+
+func TestParseHeaderBlankLineThenColumns(t *testing.T) {
+	got, err := Parse(strings.NewReader("XXT Disc\n\n  A\n  B\n\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []Table{{Name: "XXT", Columns: []string{"A", "B"}}}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("got %+v, want %+v", got, want)
+	}
+}
+
+func TestParseIgnoresCommentInsideColumns(t *testing.T) {
+	got, err := Parse(strings.NewReader("XXT Disc\n  A\n-- note\n  B\n\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []Table{{Name: "XXT", Columns: []string{"A", "B"}}}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("got %+v, want %+v", got, want)
+	}
+}
