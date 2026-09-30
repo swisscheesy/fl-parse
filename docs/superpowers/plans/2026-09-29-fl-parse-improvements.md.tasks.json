@@ -16,7 +16,7 @@
     {
       "id": 2,
       "subject": "Task 3: CSV converter",
-      "status": "pending",
+      "status": "completed",
       "description": "**Goal:** csv.Convert(name,textDir,csvDir) closes handles, has no line limit, surfaces flush errors, uses precomputed filter and non-regex digit check (bugs #4,#5,#6 + efficiency).\n\n**Files:**\n- csv/csvwriter.go\n- csv/csvwriter_test.go\n\n**Acceptance Criteria:**\n- [ ] part_number and colloquial_name filters keep current semantics; Stats correct; blank lines not counted\n- [ ] 200KB field converts without error; CRLF handled\n- [ ] Missing input returns error, no CSV; partial CSV removed on failure; csv dir auto-created\n\n**Verify:** `go test ./csv/ -v -race -> all PASS`\n\nFull steps and code: see Task 3 in docs/superpowers/plans/2026-09-29-fl-parse-improvements.md\n\n```json:metadata\n{\"files\": [\"csv/csvwriter.go\", \"csv/csvwriter_test.go\"], \"verifyCommand\": \"go test ./csv/ -v -race -> all PASS\", \"acceptanceCriteria\": [\"part_number and colloquial_name filters keep current semantics; Stats correct; blank lines not counted\", \"200KB field converts without error; CRLF handled\", \"Missing input returns error, no CSV; partial CSV removed on failure; csv dir auto-created\"], \"modelTier\": \"standard\"}\n```",
       "blockedBy": [
         0
@@ -55,5 +55,5 @@
       ]
     }
   ],
-  "lastUpdated": "2026-09-29T22:03:34.513529"
+  "lastUpdated": "2026-09-29T22:05:47.466792"
 }
