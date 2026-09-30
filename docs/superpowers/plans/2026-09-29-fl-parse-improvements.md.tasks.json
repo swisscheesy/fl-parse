@@ -48,12 +48,12 @@
     {
       "id": 5,
       "subject": "Task 6: End-to-end smoke test",
-      "status": "pending",
+      "status": "completed",
       "description": "**Goal:** Prove the pipeline end to end with a fake Decomp script on macOS, including last-table, failure and bad-schema paths.\n\n**Files:**\n- scripts/fake-decomp.sh\n\n**Acceptance Criteria:**\n- [ ] 3-table schema without trailing blank line -> Tables found: 3 and 3 ok lines\n- [ ] part_number.csv has only digit NIINs; colloquial_name.csv has no empty names\n- [ ] Failing table prints FAIL, is listed in summary, produces no CSV even with stale txt, exit code 1\n- [ ] Nonexistent -schema -> exit 1 and nothing created\n\n**Verify:** `Run Steps 2-5 of Task 6 in the plan; outputs match the Acceptance Criteria`\n\nFull steps and code: see Task 6 in docs/superpowers/plans/2026-09-29-fl-parse-improvements.md\n\n```json:metadata\n{\"files\": [\"scripts/fake-decomp.sh\"], \"verifyCommand\": \"Run Steps 2-5 of Task 6 in the plan; outputs match the Acceptance Criteria\", \"acceptanceCriteria\": [\"3-table schema without trailing blank line -> Tables found: 3 and 3 ok lines\", \"part_number.csv has only digit NIINs; colloquial_name.csv has no empty names\", \"Failing table prints FAIL, is listed in summary, produces no CSV even with stale txt, exit code 1\", \"Nonexistent -schema -> exit 1 and nothing created\"], \"modelTier\": \"standard\"}\n```",
       "blockedBy": [
         4
       ]
     }
   ],
-  "lastUpdated": "2026-09-29T22:08:03.734749"
+  "lastUpdated": "2026-09-29T22:08:41.250240"
 }
