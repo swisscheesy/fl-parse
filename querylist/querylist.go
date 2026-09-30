@@ -1,3 +1,5 @@
+// Package querylist runs Decomp for each schema table on a bounded worker pool and converts each
+// table's output to CSV as soon as its extraction finishes.
 package querylist
 
 import (
@@ -6,74 +8,89 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"time"
+
+	"fl-parse/config"
+	"fl-parse/csv"
+	"fl-parse/schema"
 )
 
-var (
-	// Destination for decomp generated txt files
-	textOutputPath = "C:\\db_texts\\"
-	// Location of decomp
-	decompPath = "C:\\FED_LOG\\TOOLS\\UTILITIES\\Decomp.exe"
-	// Location of IMDLST
-	imdListPath = "C:\\FED_LOG"
-)
-
-type QueryParams struct {
-	TableName    string
-	TableColumns []string
-}
-type QueryList struct {
-	Queries []QueryParams
+// Result is the outcome of processing one table.
+type Result struct {
+	Table   string // schema table name, e.g. XXpart_number
+	Name    string // output base name, e.g. part_number
+	Stats   csv.Stats
+	Err     error
+	Elapsed time.Duration
 }
 
-func QueryDecomp(wg *sync.WaitGroup, jobs <-chan QueryParams) {
-	for j := range jobs {
-		// Holds all the columns that will be searched for the selected table
-		var searchCols string
-
-		// Remove naming prefix and convert to lowercase
-		sFileName := strings.ToLower(j.TableName[2:len(j.TableName)])
-
-		// Set the generated .txt filepath and name
-		fileName := filepath.Join(textOutputPath + sFileName + ".txt")
-		//fileName := filepath.Join(textOutputPath + j.TableName + ".txt")
-		searchCols = strings.Join(j.TableColumns, ",")
-
-		// Display Table information
-		fmt.Printf("Worker Started \nTable: %v\n", j.TableName)
-
-		queryStr := fmt.Sprintf("select %v FROM %v", searchCols, j.TableName)
-
-		// Execute decomp command with generated parameters
-		proc := exec.Command(decompPath, imdListPath, queryStr, fileName)
-		if err := proc.Run(); err != nil {
-			fmt.Println(err)
-		}
-		wg.Done()
+// FileBase converts a schema table name to its output base name: prefix removed, lowercased.
+func FileBase(table string) (string, error) {
+	if len(table) < 3 {
+		return "", fmt.Errorf("table name %q too short to strip 2-character prefix", table)
 	}
+	return strings.ToLower(table[2:]), nil
 }
 
-// AddQuery / Adds a QueryParams to the end of the QueryList
-func (ql *QueryList) AddQuery(query QueryParams) {
-	ql.Queries = append(ql.Queries, query)
-}
-
-// InitializeDecompPoolAndRun / Creates a worker pool to query the data from Decomp
-func (ql *QueryList) InitializeDecompPoolAndRun() {
-	qWorkers := 5
-	qJobs := make(chan QueryParams, len(ql.Queries))
-	qCount := len(ql.Queries)
+// Run processes every table with exactly `workers` goroutines. onResult is always called from the
+// calling goroutine, so callers may print or aggregate without locking.
+func Run(tables []schema.Table, workers int, process func(schema.Table) Result, onResult func(Result)) {
+	jobs := make(chan schema.Table)
+	results := make(chan Result)
 
 	var wg sync.WaitGroup
-
-	for w := 0; w <= qWorkers; w++ {
-		go QueryDecomp(&wg, qJobs)
+	wg.Add(workers) // counted up front, before any goroutine can call Done
+	for i := 0; i < workers; i++ {
+		go func() {
+			defer wg.Done()
+			for t := range jobs {
+				results <- process(t)
+			}
+		}()
 	}
 
-	for j := 1; j <= qCount; j++ {
-		qJobs <- ql.Queries[j-1]
-		wg.Add(1)
-	}
-	close(qJobs)
-	wg.Wait()
+	go func() {
+		for _, t := range tables {
+			jobs <- t
+		}
+		close(jobs)
+	}()
+	go func() {
+		wg.Wait()
+		close(results)
+	}()
 
+	for r := range results {
+		onResult(r)
+	}
+}
+
+// NewProcessor returns the production process function: run Decomp for a table, then convert the
+// file it produced. Conversion is skipped when Decomp fails, so stale .txt files are never used.
+func NewProcessor(cfg config.Config) func(schema.Table) Result {
+	return func(t schema.Table) (res Result) {
+		start := time.Now()
+		res.Table = t.Name
+		// named result: the deferred update is visible to the caller
+		defer func() { res.Elapsed = time.Since(start) }()
+
+		name, err := FileBase(t.Name)
+		if err != nil {
+			res.Err = err
+			return
+		}
+		res.Name = name
+
+		txtPath := filepath.Join(cfg.TextDir, name+".txt")
+		query := fmt.Sprintf("select %v FROM %v", strings.Join(t.Columns, ","), t.Name)
+
+		cmd := exec.Command(cfg.DecompPath, cfg.IMDListPath, query, txtPath)
+		if out, err := cmd.CombinedOutput(); err != nil {
+			res.Err = fmt.Errorf("decomp failed: %w: %s", err, strings.TrimSpace(string(out)))
+			return
+		}
+
+		res.Stats, res.Err = csv.Convert(name, cfg.TextDir, cfg.CSVDir)
+		return
+	}
 }
