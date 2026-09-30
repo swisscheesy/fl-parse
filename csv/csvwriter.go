@@ -3,112 +3,95 @@ package csv
 import (
 	"bufio"
 	"encoding/csv"
-	"fmt"
-	"io/ioutil"
-	"log"
+	"io"
 	"os"
 	"path/filepath"
-	"regexp"
 	"strings"
 )
 
-var (
-	textOutputPath = "C:\\db_texts\\"
-	csvOutputPath  = "C:\\db_csv\\"
-)
-
-// GetTxtFilesFromPath / returns a string slice of all the names of all txt files in a given path
-func GetTxtFilesFromPath(txtPath string) []string {
-	files, err := ioutil.ReadDir(txtPath)
-	if err != nil {
-		panic("Unable to read text file")
-	}
-
-	return retrieveTextFiles(files)
+// Stats reports how many non-empty rows were read, written, and dropped by a table's filter.
+type Stats struct {
+	Total, Valid, Filtered int
 }
 
-// retrieveTextFiles / returns a string slice containing the names of all txt files with names that match to the
-// sent slice of os.FileInfo
-func retrieveTextFiles(f []os.FileInfo) []string {
+// rowFilter reports whether a row should be kept.
+type rowFilter func(fields []string) bool
 
-	var txtFiles []string
-	for _, v := range f {
-		//ignore all directories
-		if !v.IsDir() {
-			// Only utilize files ending with .txt
-			if filepath.Ext(v.Name()) == ".txt" {
-				txtFiles = append(txtFiles, v.Name())
+// filters holds the per-table row filters; tables not listed are unfiltered.
+var filters = map[string]rowFilter{
+	// NIIN (first column) must be digits only.
+	"part_number": func(f []string) bool { return isDigits(f[0]) },
+	// Skip rows with an empty colloquial_name column (index 2).
+	"colloquial_name": func(f []string) bool { return len(f) <= 2 || strings.TrimSpace(f[2]) != "" },
+}
+
+// isDigits reports whether s is non-empty and contains only ASCII digits 0-9.
+func isDigits(s string) bool {
+	if s == "" {
+		return false
+	}
+	for i := 0; i < len(s); i++ {
+		if s[i] < '0' || s[i] > '9' {
+			return false
+		}
+	}
+	return true
+}
+
+// Convert reads <textDir>/<name>.txt (pipe-delimited) and writes <csvDir>/<name>.csv, applying the
+// table's row filter. A partially written CSV is removed on failure.
+func Convert(name, textDir, csvDir string) (stats Stats, err error) {
+	in, err := os.Open(filepath.Join(textDir, name+".txt"))
+	if err != nil {
+		return stats, err
+	}
+	defer in.Close()
+
+	if err = os.MkdirAll(csvDir, 0o755); err != nil {
+		return stats, err
+	}
+	csvPath := filepath.Join(csvDir, name+".csv")
+	out, err := os.Create(csvPath)
+	if err != nil {
+		return stats, err
+	}
+	defer func() {
+		if cerr := out.Close(); err == nil {
+			err = cerr
+		}
+		if err != nil {
+			os.Remove(csvPath)
+		}
+	}()
+
+	w := csv.NewWriter(out)
+	keep := filters[name] // looked up once per file, not per row
+	r := bufio.NewReaderSize(in, 1<<20)
+
+	for {
+		line, rerr := r.ReadString('\n') // no line-length limit (bug #4)
+		if rerr != nil && rerr != io.EOF {
+			return stats, rerr
+		}
+		line = strings.TrimRight(line, "\r\n")
+		if line != "" {
+			stats.Total++
+			fields := strings.Split(line, "|")
+			if keep != nil && !keep(fields) {
+				stats.Filtered++
+			} else {
+				if err = w.Write(fields); err != nil {
+					return stats, err
+				}
+				stats.Valid++
 			}
+		}
+		if rerr == io.EOF {
+			break
 		}
 	}
 
-	return txtFiles
-}
-
-// isValidNIIN checks if a NIIN contains only digits (0-9)
-func isValidNIIN(niin string) bool {
-	// Check if string contains only digits
-	matched, _ := regexp.MatchString(`^\d+$`, niin)
-	return matched
-}
-
-// WriteContentToCsv / Creates a csv file for the given name, and parses the txt file of the same name
-// in order to fill it
-func WriteContentToCsv(fileName string) {
-	// Clean fileName by removing extension
-	fName := fileName[:len(fileName)-4]
-
-	csvFile, err := os.Create(filepath.Join(csvOutputPath, fName) + ".csv")
-	if err != nil {
-		log.Panicf("Unable to create file: %v", err)
-	}
-	defer csvFile.Close()
-
-	csvWriter := csv.NewWriter(csvFile)
-	defer csvWriter.Flush()
-
-	file, err := os.Open(textOutputPath + fileName)
-	if err != nil {
-		log.Panicf("Unable to open file %s due to error %v", fileName, err)
-	}
-
-	scanner := bufio.NewScanner(file)
-	fmt.Printf("Starting on file: %v\n", fName)
-
-	var totalRows, validRows, filteredRows int
-
-	for scanner.Scan() {
-		rowTxt := scanner.Text()
-		// If line is not empty
-		if len(rowTxt) > 0 {
-			totalRows++
-			// Split data by default '|' 'pipe' delimiter
-			content := strings.Split(rowTxt, "|")
-
-			// Validate NIIN (first column) only for part_number.txt - skip row if invalid
-			if fName == "part_number" && len(content) > 0 && !isValidNIIN(content[0]) {
-				filteredRows++
-				continue
-			}
-
-			// Filter colloquial_name.txt - skip rows with empty colloquial_name column (index 2)
-			if fName == "colloquial_name" && len(content) > 2 && strings.TrimSpace(content[2]) == "" {
-				filteredRows++
-				continue
-			}
-
-			err := csvWriter.Write(content)
-			if err != nil {
-				log.Panicf("Unable to write to csv file %v", err)
-			}
-			validRows++
-		}
-	}
-
-	fmt.Printf("File: %v - Total rows: %d, Valid rows: %d, Filtered rows: %d\n",
-		fName, totalRows, validRows, filteredRows)
-	if err := scanner.Err(); err != nil {
-		log.Panic(err)
-	}
-
+	w.Flush()
+	err = w.Error() // bug #6
+	return stats, err
 }
