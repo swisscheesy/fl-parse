@@ -4,7 +4,7 @@
     {
       "id": 0,
       "subject": "Task 1: Central config with flags",
-      "status": "pending",
+      "status": "completed",
       "description": "**Goal:** Add config.Config holding all paths/worker count, overridable by flags, replacing 3 duplicated textOutputPath vars.\n\n**Files:**\n- config/config.go\n- config/config_test.go\n\n**Acceptance Criteria:**\n- [ ] Default() returns current hard-coded values and Workers==5\n- [ ] Parse overrides only the given flags\n- [ ] Parse errors on -workers 0 and unknown flags without exiting\n\n**Verify:** `go test ./config/ -v -> all PASS`\n\nFull steps and code: see Task 1 in docs/superpowers/plans/2026-09-29-fl-parse-improvements.md\n\n```json:metadata\n{\"files\": [\"config/config.go\", \"config/config_test.go\"], \"verifyCommand\": \"go test ./config/ -v -> all PASS\", \"acceptanceCriteria\": [\"Default() returns current hard-coded values and Workers==5\", \"Parse overrides only the given flags\", \"Parse errors on -workers 0 and unknown flags without exiting\"], \"modelTier\": \"mechanical\"}\n```"
     },
     {
@@ -55,5 +55,5 @@
       ]
     }
   ],
-  "lastUpdated": "2026-09-29T21:59:19.690425"
+  "lastUpdated": "2026-09-29T22:01:59.079998"
 }
