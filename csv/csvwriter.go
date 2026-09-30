@@ -97,13 +97,6 @@ func WriteContentToCsv(fileName string) {
 				continue
 			}
 
-			// csv in std library doesn't easily allow additional quotes, and it's not worth rewriting.
-			// Instead, fields come out as """field""" instead of "field"
-			// Not necessary, but may find a workaround later
-			//for i := range content {
-			//	content[i] = strconv.Quote(content[i])
-			//}
-
 			err := csvWriter.Write(content)
 			if err != nil {
 				log.Panicf("Unable to write to csv file %v", err)
